@@ -26,9 +26,11 @@ The scheme accepts TCP connections on a pre-defined port.
     - `status` - Either `ACCEPTED` or `REJECTED`
     - `reason` - A brief message indicating the reason for the rejection or additional details if
     accepted.
-- **Request/Response life cycle:** Each TCP connection handles one request at a time. When a client
-  sends a request on a connection, the scheme will not process another request on that connection,
-until a response is sent to the client. Multiple connections will be established on the same port.
+- **Request/Response life cycle:**
+    - Each TCP connection handles one request at a time. When a client sends a request over a connection
+    the scheme will respond to the client, further requests will be processed only after the response is sent.
+    - Multiple connections will be established on the same port.
+    - Connections are reused for multiple requests.
 
 ### Request validation and Error handling
 
@@ -41,8 +43,8 @@ until a response is sent to the client. Multiple connections will be established
 
 ### Simulator behaviour
 
-For amounts greater than 100, to simulate processing delays on the counterparty side, the simulator 
-will respond with a delay in milliseconds equal to the `amount` (for an amount of 200, response will 
+For amounts greater than 100, to simulate processing delays on the counterparty side, the simulator
+will respond with a delay in milliseconds equal to the `amount` (for an amount of 200, response will
 be sent after at least 200ms). The maximum response delay is 10 seconds for amounts larger than 10 000.
 
 For amounts of 100 or less, there should be no delay.
@@ -58,16 +60,18 @@ Based on a previously created prototype of the service in `main.go` and `main_te
 
 **Graceful Shutdown:**
 - Implement a graceful shutdown mechanism, allowing active requests to complete before shutting
-  down.
+  down. This is to support running the service in a cloud environment where it will have a short
+amount of time to complete in-flight requests before the server is terminated.
 - The server should stop accepting new connections, but can continue accepting requests.
-- The shutdown should have a configurable timeout, for example, 3 seconds. This is the allowed
-period for active requests to complete.
+- The allowed grace period for active requests to complete should be configurable, for example 3 seconds.
 - Requests that have been accepted, but not completed after that grace period - should be rejected with: `RESPONSE|REJECTED|Cancelled`
 - Requests that have not been accepted, can be discarded without a response. (ex. slow clients)
 
 ## Evaluation
 
-The submission should be of the quality level you would expect in a commercial environment.
+We understand that in a context of a take home exercise there is a desire to demonstrate full scope
+of your design knowledge, however we will be evaluating if the design and abstractions are at an appropriate level
+for the requirements.
 
 Typical completion time for an accepted solution is about a day.
 
@@ -75,7 +79,7 @@ Your submission will be evaluated based on the following criteria:
 1. **Correctness:**
     - The solution correctly implements the required functionality.
 2. **Code quality:**
-    - The code is understandable, well-structured, and efficient. Proper use of concurrency, error
+    - The code is understandable and well-structured. Proper use of concurrency, error
     handling and resource management is demonstrated.
 3. **Testing**:
     - The solution includes comprehensive tests that cover all core functionalities and edge cases.
@@ -90,10 +94,7 @@ Your submission will be evaluated based on the following criteria:
 
 ### What successful submission looks like
 
- - The provided service prototype is elevated to the quality you would expect from a customer
- facing service. (within a limited [scope](#scope))
- - The product requirements are well understood where the submission would make sure they are
- covered, even in cases where the prototype is lacking.
+ - The product requirements are well understood.
  - The test suite clearly communicates the behaviour tested.
  - We're not looking for perfect, we're looking for a demonstration of your decision making,
  technical expertise, and design priorities. Our evaluation criteria has been benchmarked to allow
@@ -118,7 +119,7 @@ We advice to focus on meeting the core requirements.
 following:
     - Observability features such as metrics, or traces. You can add the observability you
     need to enable your development flow, however we will not be expecting production-grade detail.
-    However, we do find some level of logging to be necessary.
+    We do find some level of logging to be appropriate.
     - Deployment pipeline or release artifacts of the service.
     - Service health and readiness checks.
     - Advanced configuration management via config files, APIs, or even environment variables. It is
@@ -160,4 +161,4 @@ that as a Form3 Senior Engineer, you may not have access to those tools.
 3. Let us know you've completed the exercise using the link provided at the bottom of the email from our recruitment team.
 
 > [!CAUTION]
-> Submissions that are not private repositories will be rejected without a review.
+> Submissions must private repositories to be reviewed.
