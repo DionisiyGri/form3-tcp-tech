@@ -161,4 +161,4 @@ that as a Form3 Senior Engineer, you may not have access to those tools.
 3. Let us know you've completed the exercise using the link provided at the bottom of the email from our recruitment team.
 
 > [!CAUTION]
-> Submissions must private repositories to be reviewed.
+> Submissions must be in a private repository to be reviewed.
