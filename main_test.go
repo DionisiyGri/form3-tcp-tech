@@ -9,12 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/form3tech-oss/interview-simulator/server"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMain(m *testing.M) {
-	go Start()
+	//go Start()
+	tcpServer := server.New(8080, make(chan struct{}))
+	go tcpServer.Start()
 
 	// wait of the server to be ready
 	time.Sleep(time.Second)
