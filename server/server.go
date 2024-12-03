@@ -84,53 +84,67 @@ func (s server) handleConnection(ctx context.Context, conn net.Conn) {
 	for {
 		select {
 		case <-ctx.Done():
-			select {
-			case <-gracePeriod.C:
-				log.Printf("Grace period expired, rejecting further requests from %s", conn.RemoteAddr())
-				fmt.Fprintf(conn, "%s\n", model.ResponseRejectedCancelled)
+			if err := s.handleGracePeriodExpired(conn, gracePeriod, scanner); err != nil {
+				log.Printf("Error during processing grace period requests: %v", err)
 				return
-			default:
-				// During the grace period, allow active requests to finish
-				if scanner.Scan() {
-					req := scanner.Text()
-					log.Printf("[grace period request]: %s, Address: %s", req, conn.RemoteAddr())
-
-					// Handle request, but enforce timeout behavior
-					response := make(chan string, 1)
-					go func() {
-						response <- request.Handle(req)
-					}()
-
-					select {
-					case resp := <-response:
-						log.Printf("[grace period response]: %s, Address: %s", resp, conn.RemoteAddr())
-						fmt.Fprintf(conn, "%s\n", resp)
-						return
-					case <-gracePeriod.C:
-						log.Printf("Grace period expired during processing, rejecting request from %s", conn.RemoteAddr())
-						fmt.Fprintf(conn, "%s\n", model.ResponseRejectedCancelled)
-						return
-					}
-				} else {
-					log.Printf("No further requests to handle from %s", conn.RemoteAddr())
-					return
-				}
 			}
+			return
 		default:
-			// Handle normal request processing
-			if scanner.Scan() {
-				req := scanner.Text()
-				log.Printf("[request]: %s, Address: %s", req, conn.RemoteAddr())
-
-				response := request.Handle(req)
-				log.Printf("[response]: %s, Address: %s", response, conn.RemoteAddr())
-
-				fmt.Fprintf(conn, "%s\n", response)
-				return
-			} else {
-				log.Printf("Connection closed or no more requests from %s", conn.RemoteAddr())
+			if err := s.handleNormalRequest(scanner, conn); err != nil {
+				log.Printf("Error handling request: %v", err)
 				return
 			}
+			return
 		}
+	}
+}
+
+func (s server) handleGracePeriodExpired(conn net.Conn, gracePeriod *time.Timer, scanner *bufio.Scanner) error {
+	select {
+	case <-gracePeriod.C:
+		log.Printf("Grace period expired, rejecting further requests from %s", conn.RemoteAddr())
+		fmt.Fprintf(conn, "%s\n", model.ResponseRejectedCancelled)
+		return fmt.Errorf("grace period expired")
+	default:
+		// Allow active requests to finish during the grace period
+		if scanner.Scan() {
+			req := scanner.Text()
+			log.Printf("[grace period request]: %s, Address: %s", req, conn.RemoteAddr())
+
+			// enforce timeout behavior
+			response := make(chan string, 1)
+			go func() {
+				response <- request.Handle(req)
+			}()
+
+			select {
+			case resp := <-response:
+				log.Printf("[grace period response]: %s, Address: %s", resp, conn.RemoteAddr())
+				fmt.Fprintf(conn, "%s\n", resp)
+				return nil
+			case <-gracePeriod.C:
+				log.Printf("Grace period expired during processing, rejecting request from %s", conn.RemoteAddr())
+				fmt.Fprintf(conn, "%s\n", model.ResponseRejectedCancelled)
+				return fmt.Errorf("grace period expired during processing")
+			}
+		} else {
+			log.Printf("No further requests to handle from %s", conn.RemoteAddr())
+			return nil
+		}
+	}
+}
+
+// handleNormalRequest processes a normal request outside of the grace period.
+func (s server) handleNormalRequest(scanner *bufio.Scanner, conn net.Conn) error {
+	if scanner.Scan() {
+		req := scanner.Text()
+		log.Printf("[request]: %s, Address: %s", req, conn.RemoteAddr())
+
+		response := request.Handle(req)
+		log.Printf("[response]: %s, Address: %s", response, conn.RemoteAddr())
+		fmt.Fprintf(conn, "%s\n", response)
+		return nil
+	} else {
+		return fmt.Errorf("connection closed or no more requests")
 	}
 }
