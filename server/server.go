@@ -23,7 +23,7 @@ func New() server {
 	return server{
 		host:        "localhost",
 		port:        8080,
-		gracePeriod: 3 * time.Second,
+		gracePeriod: 2 * time.Second,
 		wg:          new(sync.WaitGroup),
 	}
 }
@@ -72,22 +72,24 @@ func (s server) handleConnection(ctx context.Context, conn net.Conn) {
 		}
 	}()
 
-	graceTimer := time.NewTimer(s.gracePeriod)
-	defer graceTimer.Stop()
+	gracePeriod := time.After(s.gracePeriod)
 
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
 		select {
 		case <-ctx.Done():
-			log.Printf("Grace period expired, rejecting request %s", conn.RemoteAddr())
-			<-graceTimer.C
-			fmt.Fprintf(conn, "%s\n", "RESPONSE|REJECTED|Cancelled")
-			return
+			select {
+			case <-gracePeriod:
+				log.Printf("Grace period expired, rejecting request from %s", conn.RemoteAddr())
+				fmt.Fprintf(conn, "%s\n", "RESPONSE|REJECTED|Cancelled")
+				return
+			default:
+			}
 		default:
 		}
 
 		req := scanner.Text()
-		log.Printf("[START]Connection address: %s, request: %s", conn.RemoteAddr(), req)
+		log.Printf("[START] Connection address: %s, request: %s", conn.RemoteAddr(), req)
 
 		response := request.Handle(req)
 		log.Printf("[FINISH]Connection address: %s, response: %s", conn.RemoteAddr(), response)
