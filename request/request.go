@@ -12,7 +12,7 @@ import (
 func Handle(request string) string {
 	parts := strings.Split(request, "|")
 	if len(parts) != 2 || parts[0] != "PAYMENT" {
-		return model.ResponseRejectedInvalidAmount
+		return model.ResponseRejectedInvalidRequest
 	}
 
 	amount, err := strconv.Atoi(parts[1])

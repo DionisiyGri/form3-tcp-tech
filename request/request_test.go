@@ -3,6 +3,8 @@ package request
 import (
 	"testing"
 	"time"
+
+	"github.com/form3tech-oss/interview-simulator/model"
 )
 
 const tolerance = 50 * time.Millisecond
@@ -18,19 +20,19 @@ func TestHandle(t *testing.T) {
 		{
 			name:     "Invalid Request - Missing Delimiter",
 			request:  "INVALIDREQUEST",
-			expected: "RESPONSE|REJECTED|Invalid request",
+			expected: model.ResponseRejectedInvalidRequest,
 			maxDelay: 0,
 		},
 		{
 			name:     "Invalid Request - Incorrect Command",
 			request:  "INVALID|123",
-			expected: "RESPONSE|REJECTED|Invalid request",
+			expected: model.ResponseRejectedInvalidRequest,
 			maxDelay: 0,
 		},
 		{
 			name:     "Invalid Amount - Non-Integer",
 			request:  "PAYMENT|abc",
-			expected: "RESPONSE|REJECTED|Invalid amount",
+			expected: model.ResponseRejectedInvalidAmount,
 			maxDelay: 0,
 		},
 
@@ -38,19 +40,19 @@ func TestHandle(t *testing.T) {
 		{
 			name:     "Valid Payment - Amount <= 100",
 			request:  "PAYMENT|50",
-			expected: "RESPONSE|ACCEPTED|Transaction processed",
+			expected: model.ResponseAccepted,
 			maxDelay: 0,
 		},
 		{
 			name:     "Valid Payment - Amount > 100",
 			request:  "PAYMENT|150",
-			expected: "RESPONSE|ACCEPTED|Transaction processed",
+			expected: model.ResponseAccepted,
 			maxDelay: 150 * time.Millisecond,
 		},
 		{
 			name:     "Valid Payment - Amount > 10000",
 			request:  "PAYMENT|15000",
-			expected: "RESPONSE|ACCEPTED|Transaction processed",
+			expected: model.ResponseAccepted,
 			maxDelay: 10 * time.Second,
 		},
 	}
