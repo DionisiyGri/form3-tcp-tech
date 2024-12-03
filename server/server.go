@@ -50,6 +50,7 @@ func (s server) Start(ctx context.Context) error {
 		conn, err := listener.Accept()
 		if err != nil {
 			if ctx.Err() != nil {
+				log.Print("stop accepting new connections")
 				break
 			}
 			log.Printf("Error accepting connection: %v", err)
@@ -67,39 +68,69 @@ func (s server) Start(ctx context.Context) error {
 	return nil
 }
 
-// handleConnection handles adctive connection to read requests and write responses
 func (s server) handleConnection(ctx context.Context, conn net.Conn) {
 	defer func() {
-		log.Printf("Closing connection from %s", conn.RemoteAddr())
+		log.Printf("Closing connection with %s", conn.RemoteAddr())
 		if err := conn.Close(); err != nil {
 			log.Printf("Close connection error: %v", err)
 		}
 	}()
 
+	gracePeriod := time.NewTimer(s.gracePeriod)
+	defer gracePeriod.Stop()
+
 	scanner := bufio.NewScanner(conn)
-	for scanner.Scan() {
+
+	for {
 		select {
 		case <-ctx.Done():
 			select {
-			case <-time.After(s.gracePeriod):
-				log.Printf("Grace period expired, rejecting request from %s", conn.RemoteAddr())
+			case <-gracePeriod.C:
+				log.Printf("Grace period expired, rejecting further requests from %s", conn.RemoteAddr())
 				fmt.Fprintf(conn, "%s\n", model.ResponseRejectedCancelled)
 				return
 			default:
+				// During the grace period, allow active requests to finish
+				if scanner.Scan() {
+					req := scanner.Text()
+					log.Printf("[grace period request]: %s, Address: %s", req, conn.RemoteAddr())
+
+					// Handle request, but enforce timeout behavior
+					response := make(chan string, 1)
+					go func() {
+						response <- request.Handle(req)
+					}()
+
+					select {
+					case resp := <-response:
+						log.Printf("[grace period response]: %s, Address: %s", resp, conn.RemoteAddr())
+						fmt.Fprintf(conn, "%s\n", resp)
+						return
+					case <-gracePeriod.C:
+						log.Printf("Grace period expired during processing, rejecting request from %s", conn.RemoteAddr())
+						fmt.Fprintf(conn, "%s\n", model.ResponseRejectedCancelled)
+						return
+					}
+				} else {
+					log.Printf("No further requests to handle from %s", conn.RemoteAddr())
+					return
+				}
 			}
 		default:
+			// Handle normal request processing
+			if scanner.Scan() {
+				req := scanner.Text()
+				log.Printf("[request]: %s, Address: %s", req, conn.RemoteAddr())
+
+				response := request.Handle(req)
+				log.Printf("[response]: %s, Address: %s", response, conn.RemoteAddr())
+
+				fmt.Fprintf(conn, "%s\n", response)
+				return
+			} else {
+				log.Printf("Connection closed or no more requests from %s", conn.RemoteAddr())
+				return
+			}
 		}
-
-		req := scanner.Text()
-		log.Printf("[START] Address: %s, request: %s", conn.RemoteAddr(), req)
-
-		response := request.Handle(req)
-		log.Printf("[FINISH] Address: %s, response: %s", conn.RemoteAddr(), response)
-
-		fmt.Fprintf(conn, "%s\n", response)
-	}
-
-	if err := scanner.Err(); err != nil {
-		log.Printf("Error reading from connection: %v", err)
 	}
 }
