@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/form3tech-oss/interview-simulator/model"
 	"github.com/form3tech-oss/interview-simulator/request"
 )
 
@@ -19,6 +20,7 @@ type server struct {
 	wg          *sync.WaitGroup
 }
 
+// New create a new server instance
 func New() server {
 	return server{
 		host:        "localhost",
@@ -29,6 +31,7 @@ func New() server {
 }
 
 // Start tcp server and ready to accept connections
+// Listens to context cancelation to shoutdown and cleanup
 func (s server) Start(ctx context.Context) error {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", s.host, s.port))
 	if err != nil {
@@ -64,6 +67,7 @@ func (s server) Start(ctx context.Context) error {
 	return nil
 }
 
+// handleConnection handles adctive connection to read requests and write responses
 func (s server) handleConnection(ctx context.Context, conn net.Conn) {
 	defer func() {
 		log.Printf("closing connection from %s", conn.RemoteAddr())
@@ -72,16 +76,14 @@ func (s server) handleConnection(ctx context.Context, conn net.Conn) {
 		}
 	}()
 
-	gracePeriod := time.After(s.gracePeriod)
-
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
 		select {
 		case <-ctx.Done():
 			select {
-			case <-gracePeriod:
+			case <-time.After(s.gracePeriod):
 				log.Printf("Grace period expired, rejecting request from %s", conn.RemoteAddr())
-				fmt.Fprintf(conn, "%s\n", "RESPONSE|REJECTED|Cancelled")
+				fmt.Fprintf(conn, "%s\n", model.ResponseRejectedCancelled)
 				return
 			default:
 			}

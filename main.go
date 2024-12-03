@@ -11,11 +11,11 @@ import (
 )
 
 // TODO:
-// 1. Implement a graceful shutdown mechanism, allowing active requests to complete before shutting down.
-// 2. The server should stop accepting new connections, but can continue accepting requests.
-// 3. The allowed grace period for active requests to complete should be configurable, for example 3 seconds.
-// 4. Requests that have been accepted, but not completed after that grace period - should be rejected with: RESPONSE|REJECTED|Cancelled
-// 5. Requests that have not been accepted, can be discarded without a response. (ex. slow clients)
+// 1. Implement a graceful shutdown mechanism, allowing active requests to complete before shutting down. +
+// 2. The server should stop accepting new connections, but can continue accepting requests. +
+// 3. The allowed grace period for active requests to complete should be configurable, for example 3 seconds. +
+// 4. Requests that have been accepted, but not completed after that grace period - should be rejected with: RESPONSE|REJECTED|Cancelled +
+// 5. Requests that have not been accepted, can be discarded without a response. (ex. slow clients) +
 
 func main() {
 	shutdown := make(chan os.Signal, 1)
