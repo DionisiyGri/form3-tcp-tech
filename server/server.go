@@ -70,9 +70,9 @@ func (s server) Start(ctx context.Context) error {
 // handleConnection handles adctive connection to read requests and write responses
 func (s server) handleConnection(ctx context.Context, conn net.Conn) {
 	defer func() {
-		log.Printf("closing connection from %s", conn.RemoteAddr())
+		log.Printf("Closing connection from %s", conn.RemoteAddr())
 		if err := conn.Close(); err != nil {
-			log.Printf("cannot close connection. err = %v", err)
+			log.Printf("Close connection error: %v", err)
 		}
 	}()
 
@@ -91,10 +91,10 @@ func (s server) handleConnection(ctx context.Context, conn net.Conn) {
 		}
 
 		req := scanner.Text()
-		log.Printf("[START] Connection address: %s, request: %s", conn.RemoteAddr(), req)
+		log.Printf("[START] Address: %s, request: %s", conn.RemoteAddr(), req)
 
 		response := request.Handle(req)
-		log.Printf("[FINISH]Connection address: %s, response: %s", conn.RemoteAddr(), response)
+		log.Printf("[FINISH] Address: %s, response: %s", conn.RemoteAddr(), response)
 
 		fmt.Fprintf(conn, "%s\n", response)
 	}
