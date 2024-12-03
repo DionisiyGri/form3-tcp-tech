@@ -4,6 +4,7 @@ package model
 const (
 	ResponseAccepted = "RESPONSE|ACCEPTED|Transaction processed"
 
-	ResponseRejectedInvalidAmount = "RESPONSE|REJECTED|Invalid request"
-	ResponseRejectedCancelled     = "RESPONSE|REJECTED|Cancelled"
+	ResponseRejectedInvalidRequest = "RESPONSE|REJECTED|Invalid request"
+	ResponseRejectedInvalidAmount  = "RESPONSE|REJECTED|Invalid amount"
+	ResponseRejectedCancelled      = "RESPONSE|REJECTED|Cancelled"
 )
