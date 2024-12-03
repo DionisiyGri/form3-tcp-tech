@@ -50,6 +50,7 @@ func (s server) Start() error {
 		conn, err := listener.Accept()
 		select {
 		case <-stopAccepting:
+			log.Print("Stop receiving connections")
 			return nil
 		default:
 		}
@@ -69,33 +70,39 @@ func (s server) Start() error {
 }
 
 func (s server) handleConnection(conn net.Conn) {
-	defer conn.Close()
+	defer func() {
+		log.Print("closing connection")
+		if err := conn.Close(); err != nil {
+			log.Printf("cannot close connection. err = %v", err)
+		}
+	}()
+
+	graceTimer := time.NewTimer(s.gracePeriod)
+	defer graceTimer.Stop()
 
 	scanner := bufio.NewScanner(conn)
-	for {
+
+	for scanner.Scan() {
 		select {
 		case <-s.shutdownSig:
 			select {
-			case <-time.NewTimer(s.gracePeriod).C:
+			case <-graceTimer.C:
 				log.Print("Grace period expired, rejecting request")
-				fmt.Fprintf(conn, "RESPONSE|REJECTED|Cancelled")
+				fmt.Fprintf(conn, "%s\n", "RESPONSE|REJECTED|Cancelled")
 				return
 			default:
+				//processing request during grace period
 			}
 		default:
 		}
 
-		if scanner.Scan() {
-			req := scanner.Text()
-			log.Printf("request start: %s", req)
+		req := scanner.Text()
+		log.Printf("request start: %s", req)
 
-			response := request.Handle(req)
-			log.Printf("request finish:%s", req)
+		response := request.Handle(req)
+		log.Printf("request finish:%s", req)
 
-			fmt.Fprintf(conn, "%s\n", response)
-		} else {
-			break
-		}
+		fmt.Fprintf(conn, "%s\n", response)
 	}
 
 	if err := scanner.Err(); err != nil {

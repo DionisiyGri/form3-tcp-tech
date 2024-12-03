@@ -15,7 +15,6 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	//go Start()
 	tcpServer := server.New(8080, make(chan struct{}))
 	go tcpServer.Start()
 
