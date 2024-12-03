@@ -1,20 +1,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
-	"time"
 
 	"github.com/form3tech-oss/interview-simulator/server"
-)
-
-var (
-	shutdownSignal = make(chan struct{})
-	wg             sync.WaitGroup
-	gracePeriod    = 3 * time.Second
 )
 
 // TODO:
@@ -28,14 +21,15 @@ func main() {
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 
+	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		<-shutdown
 		log.Print("Shutdown signal received. Stopping server...")
-		close(shutdownSignal)
+		cancel()
 	}()
 
-	tcpServer := server.New(8080, shutdownSignal)
-	if err := tcpServer.Start(); err != nil {
+	tcpServer := server.New()
+	if err := tcpServer.Start(ctx); err != nil {
 		log.Printf("Server error: %v", err)
 	}
 

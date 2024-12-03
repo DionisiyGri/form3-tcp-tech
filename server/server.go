@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -16,31 +17,27 @@ type server struct {
 	port        int
 	gracePeriod time.Duration
 	wg          *sync.WaitGroup
-	shutdownSig chan struct{}
 }
 
-func New(port int, shutdownSig chan struct{}) server {
+func New() server {
 	return server{
 		host:        "localhost",
-		port:        port,
+		port:        8080,
 		gracePeriod: 3 * time.Second,
 		wg:          new(sync.WaitGroup),
-		shutdownSig: shutdownSig,
 	}
 }
 
 // Start tcp server and ready to accept connections
-func (s server) Start() error {
+func (s server) Start(ctx context.Context) error {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", s.host, s.port))
 	if err != nil {
 		return err
 	}
 
-	//register gracefull shutdown functionality (a kind of)
-	stopAccepting := make(chan struct{})
 	go func() {
-		<-s.shutdownSig
-		close(stopAccepting)
+		<-ctx.Done()
+		log.Print("Shutting down server: closing listener")
 		listener.Close()
 	}()
 
@@ -48,14 +45,10 @@ func (s server) Start() error {
 
 	for {
 		conn, err := listener.Accept()
-		select {
-		case <-stopAccepting:
-			log.Print("Stop receiving connections")
-			return nil
-		default:
-		}
-
 		if err != nil {
+			if ctx.Err() != nil {
+				break
+			}
 			log.Printf("Error accepting connection: %v", err)
 			continue
 		}
@@ -63,15 +56,17 @@ func (s server) Start() error {
 		s.wg.Add(1)
 		go func() {
 			defer s.wg.Done()
-			s.handleConnection(conn)
+			s.handleConnection(ctx, conn)
 		}()
-		s.wg.Wait()
 	}
+	s.wg.Wait()
+	log.Println("All connections closed. Server shutdown complete.")
+	return nil
 }
 
-func (s server) handleConnection(conn net.Conn) {
+func (s server) handleConnection(ctx context.Context, conn net.Conn) {
 	defer func() {
-		log.Print("closing connection")
+		log.Printf("closing connection from %s", conn.RemoteAddr())
 		if err := conn.Close(); err != nil {
 			log.Printf("cannot close connection. err = %v", err)
 		}
@@ -81,26 +76,21 @@ func (s server) handleConnection(conn net.Conn) {
 	defer graceTimer.Stop()
 
 	scanner := bufio.NewScanner(conn)
-
 	for scanner.Scan() {
 		select {
-		case <-s.shutdownSig:
-			select {
-			case <-graceTimer.C:
-				log.Print("Grace period expired, rejecting request")
-				fmt.Fprintf(conn, "%s\n", "RESPONSE|REJECTED|Cancelled")
-				return
-			default:
-				//processing request during grace period
-			}
+		case <-ctx.Done():
+			log.Printf("Grace period expired, rejecting request %s", conn.RemoteAddr())
+			<-graceTimer.C
+			fmt.Fprintf(conn, "%s\n", "RESPONSE|REJECTED|Cancelled")
+			return
 		default:
 		}
 
 		req := scanner.Text()
-		log.Printf("request start: %s", req)
+		log.Printf("[START]Connection address: %s, request: %s", conn.RemoteAddr(), req)
 
 		response := request.Handle(req)
-		log.Printf("request finish:%s", req)
+		log.Printf("[FINISH]Connection address: %s, response: %s", conn.RemoteAddr(), response)
 
 		fmt.Fprintf(conn, "%s\n", response)
 	}

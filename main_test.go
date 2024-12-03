@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -15,8 +16,8 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	tcpServer := server.New(8080, make(chan struct{}))
-	go tcpServer.Start()
+	tcpServer := server.New()
+	go tcpServer.Start(context.Background())
 
 	// wait of the server to be ready
 	time.Sleep(time.Second)
