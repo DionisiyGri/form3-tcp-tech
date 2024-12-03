@@ -23,7 +23,7 @@ func TestGracefulShutdown(t *testing.T) {
 	}
 
 	t.Run("ActiveRequestsComplete", func(t *testing.T) {
-		s := New()
+		s := New(8080)
 		ctx, cancel := context.WithCancel(context.Background())
 
 		startServer(s, ctx)
@@ -48,7 +48,7 @@ func TestGracefulShutdown(t *testing.T) {
 	})
 
 	t.Run("StopAcceptingNewConnections", func(t *testing.T) {
-		s := New()
+		s := New(8080)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -77,7 +77,7 @@ func TestGracefulShutdown(t *testing.T) {
 	})
 
 	t.Run("GracePeriodRequestsComplete", func(t *testing.T) {
-		s := New()
+		s := New(8080)
 		ctx, cancel := context.WithCancel(context.Background())
 
 		startServer(s, ctx)
@@ -103,7 +103,7 @@ func TestGracefulShutdown(t *testing.T) {
 	})
 
 	t.Run("RejectAfterGracePeriod", func(t *testing.T) {
-		s := New()
+		s := New(8080)
 		ctx, cancel := context.WithCancel(context.Background())
 
 		startServer(s, ctx)
@@ -131,7 +131,7 @@ func TestGracefulShutdown(t *testing.T) {
 	})
 
 	t.Run("RequestsNotAcceptedDuringShutdown", func(t *testing.T) {
-		s := New()
+		s := New(8080)
 		ctx, cancel := context.WithCancel(context.Background())
 
 		startServer(s, ctx)

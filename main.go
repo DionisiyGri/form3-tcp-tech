@@ -28,7 +28,7 @@ func main() {
 		cancel()
 	}()
 
-	tcpServer := server.New()
+	tcpServer := server.New(8080)
 	if err := tcpServer.Start(ctx); err != nil {
 		log.Printf("Server error: %v", err)
 	}

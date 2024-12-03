@@ -21,10 +21,10 @@ type server struct {
 }
 
 // New create a new server instance
-func New() server {
+func New(port int) server {
 	return server{
 		host:        "localhost",
-		port:        8080,
+		port:        port,
 		gracePeriod: 2 * time.Second,
 		wg:          new(sync.WaitGroup),
 	}

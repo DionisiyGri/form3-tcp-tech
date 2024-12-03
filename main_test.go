@@ -16,7 +16,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	tcpServer := server.New()
+	tcpServer := server.New(8081)
 	go tcpServer.Start(context.Background())
 
 	// wait of the server to be ready
@@ -66,7 +66,7 @@ func TestSchemeSimulator(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			conn, err := net.Dial("tcp", ":8080")
+			conn, err := net.Dial("tcp", ":8081")
 			require.NoError(t, err, "Failed to connect to server")
 			defer conn.Close()
 
