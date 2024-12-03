@@ -12,113 +12,136 @@ import (
 )
 
 func TestGracefulShutdown(t *testing.T) {
-	s := New()
-	s.gracePeriod = 3 * time.Second
-
-	ctx, cancel := context.WithCancel(context.Background())
-
-	go func() {
-		if err := s.Start(ctx); err != nil && ctx.Err() == nil {
-			t.Fatalf("Failed to start server: %v", err)
-		}
-	}()
-
-	time.Sleep(100 * time.Millisecond) // give some time for server to start
+	// Helper function to configure and start the server
+	startServer := func(s server, ctx context.Context) {
+		go func() {
+			if err := s.Start(ctx); err != nil && ctx.Err() == nil {
+				t.Fatalf("Failed to start server: %v", err)
+			}
+		}()
+		time.Sleep(time.Second)
+	}
 
 	t.Run("ActiveRequestsComplete", func(t *testing.T) {
-		conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", s.host, s.port)) //create connection
+		s := New()
+		ctx, cancel := context.WithCancel(context.Background())
+
+		startServer(s, ctx)
+
+		conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", s.host, s.port))
 		if err != nil {
 			t.Fatalf("Failed to connect to server: %v", err)
 		}
 		defer conn.Close()
 
-		fmt.Fprintf(conn, "PAYMENT|150\n") //sending request
-		cancel()                           //shutdown
+		// Send request
+		fmt.Fprintf(conn, "PAYMENT|150\n")
+		cancel() // Shutdown
 
 		scanner := bufio.NewScanner(conn)
-		for scanner.Scan() {
-			resp := scanner.Text()
-			if resp != model.ResponseAccepted {
-				t.Errorf("Expected %s response, got %s", model.ResponseAccepted, resp)
-			}
+		if !scanner.Scan() {
+			t.Fatal("Failed to read response")
 		}
-		if scanner.Err() != nil {
-			t.Errorf("Failed to scan response: %v", err)
+		if resp := scanner.Text(); resp != model.ResponseAccepted {
+			t.Errorf("Expected %s response, got %s", model.ResponseAccepted, resp)
 		}
 	})
+
 	t.Run("StopAcceptingNewConnections", func(t *testing.T) {
-		conn1, err := net.Dial("tcp", fmt.Sprintf("%s:%d", s.host, s.port)) // creating 1st connection
+		s := New()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		startServer(s, ctx)
+
+		// First connection
+		conn1, err := net.Dial("tcp", fmt.Sprintf("%s:%d", s.host, s.port))
 		if err != nil {
 			t.Fatalf("Failed to establish connection to server: %v", err)
 		}
 		defer conn1.Close()
 
-		fmt.Fprintf(conn1, "PAYMENT|150\n") //sending request
+		// Send request
+		fmt.Fprintf(conn1, "PAYMENT|150\n")
 
-		cancel() //shutdown
-		time.Sleep(100 * time.Millisecond)
+		// Trigger shutdown
+		cancel()
+		time.Sleep(100 * time.Millisecond) // Wait to allow server to stop accepting new connections
 
-		conn2, err := net.Dial("tcp", fmt.Sprintf("%s:%d", s.host, s.port)) // creating 2nd connection
-		if err == nil {                                                     // Connection shouldnt be accepted
+		// Second connection attempt
+		conn2, err := net.Dial("tcp", fmt.Sprintf("%s:%d", s.host, s.port))
+		if err == nil {
 			conn2.Close()
 			t.Error("Server accepted a new connection after shutdown initiated")
 		}
 	})
 
 	t.Run("GracePeriodRequestsComplete", func(t *testing.T) {
+		s := New()
+		ctx, cancel := context.WithCancel(context.Background())
+
+		startServer(s, ctx)
+
 		conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", s.host, s.port))
 		if err != nil {
 			t.Fatalf("Failed to connect to server: %v", err)
 		}
 		defer conn.Close()
 
-		fmt.Fprintf(conn, "PAYMENT|1500\n") // 1.5 seconds
-		cancel()                            // Trigger shutdown
+		// Send a request within the grace period
+		fmt.Fprintf(conn, "PAYMENT|1500\n")
+		cancel() // Trigger shutdown
 
+		// Read the response
 		scanner := bufio.NewScanner(conn)
-		for scanner.Scan() {
-			resp := scanner.Text()
-			if resp != model.ResponseAccepted {
-				t.Errorf("Expected %s response, got %s", model.ResponseAccepted, resp)
-			}
+		if !scanner.Scan() {
+			t.Fatal("Failed to read response")
 		}
-		if scanner.Err() != nil {
-			t.Errorf("Failed to scan response: %v", err)
+		if resp := scanner.Text(); resp != model.ResponseAccepted {
+			t.Errorf("Expected %s response, got %s", model.ResponseAccepted, resp)
 		}
 	})
 
 	t.Run("RejectAfterGracePeriod", func(t *testing.T) {
+		s := New()
+		ctx, cancel := context.WithCancel(context.Background())
+
+		startServer(s, ctx)
+
 		conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", s.host, s.port))
 		if err != nil {
 			t.Fatalf("Failed to connect to server: %v", err)
 		}
 		defer conn.Close()
 
-		fmt.Fprintf(conn, "PAYMENT|5000\n") // 5sec request  (> 3 seconds)
+		// Send a request that will exceed the grace period
 		cancel()
+		fmt.Fprintf(conn, "PAYMENT|5000\n")
 
-		time.Sleep(4 * time.Second) // Wait for grace period to expire
+		time.Sleep(3500 * time.Millisecond) // Wait for grace period to expire
 
+		// Read the response after grace period
 		scanner := bufio.NewScanner(conn)
-		for scanner.Scan() {
-			resp := scanner.Text()
-			if resp != model.ResponseRejectedCancelled {
-				t.Errorf("Expected %s response, got %s", model.ResponseRejectedCancelled, resp)
-			}
+		if !scanner.Scan() {
+			t.Fatal("Failed to read response")
 		}
-		if scanner.Err() != nil {
-			t.Errorf("Failed to scan response: %v", err)
+		if resp := scanner.Text(); resp != model.ResponseRejectedCancelled {
+			t.Errorf("Expected %s response, got %s", model.ResponseRejectedCancelled, resp)
 		}
 	})
 
 	t.Run("RequestsNotAcceptedDuringShutdown", func(t *testing.T) {
-		cancel() // Trigger shutdown immediately
+		s := New()
+		ctx, cancel := context.WithCancel(context.Background())
 
+		startServer(s, ctx)
+		cancel()
+
+		// Try to establish a connection during shutdown
 		conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", s.host, s.port))
-		if err == nil { // Connection should not be established during shutdown
+		if err == nil {
 			conn.Close()
 			t.Error("Server accepted a connection during shutdown")
 		}
 	})
-
 }
