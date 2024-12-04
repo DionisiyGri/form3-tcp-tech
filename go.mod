@@ -1,4 +1,4 @@
-module github.com/form3tech-oss/interview-simulator
+module github.com/form3-tcp-tech
 
 go 1.23.0
 
