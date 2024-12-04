@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/form3tech-oss/interview-simulator/model"
+	"github.com/form3-tcp-tech/model"
 )
 
 func TestGracefulShutdown(t *testing.T) {

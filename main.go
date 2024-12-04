@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/form3tech-oss/interview-simulator/server"
+	"github.com/form3-tcp-tech/server"
 )
 
 // TODO:

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/form3tech-oss/interview-simulator/model"
+	"github.com/form3-tcp-tech/model"
 )
 
 const tolerance = 50 * time.Millisecond
